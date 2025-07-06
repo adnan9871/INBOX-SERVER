@@ -1,20 +1,2 @@
-{
-  "manifest_version": 3,
-  "name": "Facebook Message Sender",
-  "version": "1.0",
-  "description": "Send Facebook messages manually via cookie and thread ID",
-  "permissions": ["scripting", "activeTab", "tabs", "storage"],
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "FB Messenger Sender"
-  },
-  "content_scripts": [
-    {
-      "matches": ["https://www.facebook.com/messages/t/*"],
-      "js": ["content_script.js"]
-    }
-  ],
-  "host_permissions": [
-    "https://www.facebook.com/*"
-  ]
-}
+Flask 
+requests
