@@ -1,22 +1,146 @@
-PK��xZp���content_script.js�T�n�0��+:D2"(-zs�m�S�C�[��L�,��r�m���$��"A�e�y���4���x�=�����;�rο�P�I�<Z��E��t�_hk�,.a}@��[K̤�%Q��'� T J�Q�U�BO��n	DC����..���ֈ|�g������͢��E�sB�1�t�J�#����F?��z��T_8P�w&Q�\y6)ކ8��
-�P����=.{�� ���:�f��bgTsܠD�I⇾	ȅ˷ב3�Ǹ��XzGw�������D69C{V�d���rœȶJ�HIg*ri1�|3���;��ָ{���+�
-vuQy��Д;*���x���ng\�ل�k>��_��=|��V�߅ILt\�U�Δ:�W���t6�i����m���|�����{�41vad&�L���[玕�q�B�Uz�
-������}|�>t��sy9Ue���}��KζwX�1��Q���D.�6�+�~aK˨��B{ų�x1~k�CL���E�PK-�xZ�a��4
-manifest.jsonU�;�0D{Nam����TС(2f�⏼R �?H��3�7c�VB�U��H�=1��b��NYL�H�n�(N�
-�l��	�
-#�����V/`���Mɿ�h��P����
-m	g]�WRI߰W��]�a����v��xH{�踫�e�[�zĺ;2:4Ͳ,�W��?�����#Ԭ�#w���Ln�G���PK�xZO�F^popup.jsu�Mo�0���"v���J=T�N��CWM4qY6,1]���}�ЯC#�-�絮U[�%Y �J���n�E���)�0��ֳ
-ן�'��D�J�~�֭Udj+"؏����'����@�{��n���lQ�3���oJC"��A$צ$&V��l<dA4���Q3�ɝǹ%q~T��1<%<�?Iƣ�ߗ�+�'_y�ۢۉ=���
-�@���Z�ݻ����p���{r媥W�4dl!q��%|=�E������\�]��d)�fʍ�
-B��"`x;����g!OƖ�����gv�~�w".��G8m3=gqou:8~�p$
-y��PKýxZ�CMr�9
-popup.html�U[o�0~G�?2�m�iӆ��K+��I��n�$�m�Nׂ����5�"�j���w.��\�|���2[�ׯ��d��	Yns��c��WfI��&��������_x���蔋W-EJ�H�Ik��
-��xהiI;���	)x�[��T�s:C��
-�<iD�Q���>�5��Z��.�$	�Y2�,SnTN�j����Ci,Ov~�~�����Or�
-�[V�/c<�Pe�l��,Pۧ��c���h3�q�Ƽ�-\�P^t;�y=�����)��tA�kr�������N�S�U´�k���� �s`������p˥��84G�^dr�t��0\i	wv��X�v����4���e.5�@�OZ˵;,M�ь��U�����<M	�R9�Aݐ�	�s
-'q?W�K�9yz�G��͹@�����m��Dƥi��4�������u�o2�\�C(���|�\Tm]b��c:���� ���0�*�f�
-}\j㤕��05�<��b�E�v�F�f9Gn��Y�)�@�c���1���Q���f"EgK+�-n�3���V��
-�t���=�<�e�L樰�n\�P���*g�8C�A!˵��x<�VѤ����'��[z�,�L{�;�����h�M0W25\,������Z�5��%����[�"I�f-���D�Z�L���`t���T�?xM��P�!�.���PK��xZp�����content_script.jsPK-�xZ�a��4
-��Emanifest.jsonPK�xZO�F^��2popup.jsPK?ýxZ�CMr�9
-$ ����popup.html
- ������fo)5��$�����PK�
+document.addEventListener("DOMContentLoaded", () => {
+  const sendBtn = document.getElementById("send");
+  const fileInput = document.getElementById("file");
+  const delayInput = document.getElementById("delay");
+  const threadList = document.getElementById("threads");
+
+  let threads = JSON.parse(localStorage.getItem("threads") || "{}");
+
+  function saveThreads() {
+    localStorage.setItem("threads", JSON.stringify(threads));
+  }
+
+  sendBtn.addEventListener("click", () => {
+    const cookie = document.getElementById("cookie").value.trim();
+    const threadID = document.getElementById("thread").value.trim();
+    const delay = parseInt(delayInput.value.trim()) * 1000;
+
+    if (!cookie || !threadID || !fileInput.files.length || isNaN(delay)) {
+      alert("Please fill all fields and select a .txt file.");
+      return;
+    }
+
+    if (threads[threadID]) {
+      alert("Thread already exists in history or running!");
+      return;
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      const messages = reader.result.split("\n").map(m => m.trim()).filter(Boolean);
+      if (!messages.length) {
+        alert("The message file is empty!");
+        return;
+      }
+
+      const url = `https://www.facebook.com/messages/t/${threadID}`;
+      threads[threadID] = { url, messages, delay, index: 0, count: 0, running: true };
+      saveThreads();
+
+      chrome.tabs.create({ url }, (tab) => {
+        const maxAttempts = 10;
+        let attempt = 0;
+
+        const trySendMessage = () => {
+          const thread = threads[threadID];
+          if (!thread || !thread.running || thread.index >= thread.messages.length) return;
+
+          const message = thread.messages[thread.index];
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: (cookie, message) => {
+              document.cookie = cookie;
+              const textbox = document.querySelector('[role="textbox"]') || document.querySelector('[contenteditable="true"]');
+              if (!textbox) return false;
+              textbox.focus();
+              document.execCommand('insertText', false, message);
+              setTimeout(() => {
+                const enter = new KeyboardEvent('keydown', {
+                  key: 'Enter',
+                  code: 'Enter',
+                  keyCode: 13,
+                  which: 13,
+                  bubbles: true
+                });
+                textbox.dispatchEvent(enter);
+              }, 1000);
+              return true;
+            },
+            args: [cookie, message]
+          }, (results) => {
+            const success = results && results[0] && results[0].result;
+            if (!success && attempt < maxAttempts) {
+              attempt++;
+              setTimeout(trySendMessage, 2000);
+            } else if (!success) {
+              threads[threadID].running = false;
+              saveThreads();
+              updateThreadsUI();
+              alert("❌ Message box not found.");
+            } else {
+              threads[threadID].index++;
+              threads[threadID].count++;
+              saveThreads();
+              updateThreadsUI();
+              if (threads[threadID].index < threads[threadID].messages.length) {
+                setTimeout(trySendMessage, delay);
+              } else {
+                threads[threadID].running = false;
+                saveThreads();
+                updateThreadsUI();
+              }
+            }
+          });
+        };
+
+        setTimeout(trySendMessage, 8000); // extra wait for slow tab
+        updateThreadsUI();
+      });
+    };
+
+    reader.readAsText(file);
+  });
+
+  function updateThreadsUI() {
+    threadList.innerHTML = '';
+    for (const id in threads) {
+      const t = threads[id];
+      const div = document.createElement("div");
+      div.className = "thread-box";
+      div.innerHTML = `
+        <div class="thread-header">🧵 <a href="${t.url}" target="_blank">${id}</a></div>
+        <div class="thread-details">
+          ⏱ Delay: ${t.delay / 1000}s<br/>
+          📨 Sent: ${t.count} / ${t.messages.length}<br/>
+          🔁 Status: ${t.running ? "🟢 Active" : "🔴 Stopped"}
+        </div>
+        <button data-id="${id}" class="stop-btn">⛔ Stop</button>
+        <button data-id="${id}" class="close-btn">❌ Remove</button>
+      `;
+      threadList.appendChild(div);
+    }
+
+    document.querySelectorAll(".stop-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-id");
+        if (threads[id]) {
+          threads[id].running = false;
+          saveThreads();
+          updateThreadsUI();
+        }
+      });
+    });
+
+    document.querySelectorAll(".close-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-id");
+        delete threads[id];
+        saveThreads();
+        updateThreadsUI();
+      });
+    });
+  }
+
+  updateThreadsUI();
+});
